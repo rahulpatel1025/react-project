@@ -28,7 +28,7 @@ try {
 }
 
 // ✅ Use a valid Gemini model
-const MODEL_ID = "gemini-1.5-flash-002";
+const MODEL_ID = "gemini-2.5-pro";
 
 app.post("/api/generate", async (req, res) => {
   try {
