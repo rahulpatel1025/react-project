@@ -12,6 +12,7 @@ const PORT = process.env.PORT || 5000;
 app.use(cors());
 app.use(bodyParser.json());
 
+// Use GEMINI_API_KEY from .env
 const API_KEY = process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY;
 if (!API_KEY) {
   console.error("ERROR: Missing GEMINI_API_KEY in backend/.env");
@@ -20,16 +21,22 @@ if (!API_KEY) {
 let genAI;
 try {
   if (API_KEY) {
-    genAI = new GoogleGenerativeAI(API_KEY);
+    genAI = new GoogleGenerativeAI({ apiKey: API_KEY });
     console.log("Gemini client initialized.");
   }
 } catch (e) {
-  console.error("Failed to init GoogleGenerativeAI:", e);
+  console.error("Failed to initialize GoogleGenerativeAI:", e);
 }
 
-// ✅ Use a valid Gemini model
+// ✅ Gemini 2.5 Pro model
 const MODEL_ID = "gemini-2.5-pro";
 
+// Health check endpoint
+app.get("/api/health", (_req, res) => {
+  res.json({ ok: true, model: MODEL_ID });
+});
+
+// Generate text endpoint
 app.post("/api/generate", async (req, res) => {
   try {
     if (!genAI) return res.status(500).json({ error: "Gemini not initialized" });
@@ -39,26 +46,13 @@ app.post("/api/generate", async (req, res) => {
       return res.status(400).json({ error: "Prompt required" });
     }
 
-    const model = genAI.getGenerativeModel({ model: MODEL_ID });
+    // ✅ Correct API call for Gemini 2.5 Pro
+    const response = await genAI.responses.create({
+      model: MODEL_ID,
+      input: prompt.trim()
+    });
 
-    // SDK now supports passing string directly
-    const result = await model.generateContent(prompt.trim());
-
-    // Extract text safely
-    let text = "";
-    try {
-      if (result?.response?.text) {
-        text = result.response.text().trim();
-      } else {
-        text =
-          result?.response?.candidates?.[0]?.content?.parts
-            ?.map(p => p.text)
-            .join("\n")
-            .trim() || "";
-      }
-    } catch (inner) {
-      console.warn("Text extraction issue:", inner);
-    }
+    const text = response.output_text || "";
 
     if (!text) {
       return res.status(502).json({ error: "Empty response from Gemini" });
@@ -69,10 +63,6 @@ app.post("/api/generate", async (req, res) => {
     console.error("Gemini API error:", err?.response?.data || err);
     res.status(500).json({ error: err.message || "Generation failed" });
   }
-});
-
-app.get("/api/health", (_req, res) => {
-  res.json({ ok: true, model: MODEL_ID });
 });
 
 app.listen(PORT, () => {
