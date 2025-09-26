@@ -28,8 +28,8 @@ try {
   console.error("Failed to initialize GoogleGenerativeAI:", e);
 }
 
-// ✅ Gemini 2.5 Pro model
-const MODEL_ID = "gemini-2.5-pro";
+// ✅ Use Gemini 2.0 Flash model
+const MODEL_ID = "gemini-2.0-flash";
 
 // Health check endpoint
 app.get("/api/health", (_req, res) => {
@@ -46,7 +46,7 @@ app.post("/api/generate", async (req, res) => {
       return res.status(400).json({ error: "Prompt required" });
     }
 
-    // ✅ Correct API call for Gemini 2.5 Pro
+    // ✅ API call using Gemini 2.0 Flash
     const response = await genAI.responses.create({
       model: MODEL_ID,
       input: prompt.trim()
