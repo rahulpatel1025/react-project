@@ -12,23 +12,44 @@ const PORT = process.env.PORT || 5000;
 app.use(cors());
 app.use(bodyParser.json());
 
-// Load API key from .env (on backend)
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+const API_KEY = process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY;
+if (!API_KEY) {
+  console.error("Missing GEMINI_API_KEY in backend/.env");
+}
+
+let genAI = null;
+try {
+  if (API_KEY) genAI = new GoogleGenerativeAI(API_KEY);
+} catch (e) {
+  console.error("Failed to init GoogleGenerativeAI:", e);
+}
 
 app.post("/api/generate", async (req, res) => {
   try {
+    if (!genAI) return res.status(500).json({ error: "Gemini not initialized" });
     const { prompt } = req.body;
-
+    if (!prompt || !prompt.trim()) {
+      return res.status(400).json({ error: "Prompt required" });
+    }
     const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-    const result = await model.generateContent(prompt);
+    const result = await model.generateContent([prompt.trim()]);
+    const text =
+      result?.response?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || "";
 
-    res.json({ text: result.response.text() });
+    if (!text) {
+      return res.status(502).json({ error: "Empty response from Gemini" });
+    }
+    res.json({ text });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: err.message });
+    console.error("Backend error:", err);
+    res.status(500).json({ error: err.message || "Generation failed" });
   }
 });
 
+app.get("/api/health", (_req, res) => {
+  res.json({ ok: true });
+});
+
 app.listen(PORT, () => {
-  console.log(`🚀 Backend running on http://localhost:${PORT}`);
+  console.log(`Backend running on http://localhost:${PORT}`);
 });

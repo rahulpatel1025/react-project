@@ -1,44 +1,44 @@
-import React, { createContext, useContext, useState } from "react";
+import React, { createContext, useContext, useState, useCallback } from "react";
 
-const GeminiContext = createContext();
+const GeminiContext = createContext(null);
 
-export const useGemini = () => useContext(GeminiContext);
+export const useGemini = () => {
+  const ctx = useContext(GeminiContext);
+  if (!ctx) throw new Error("useGemini must be used inside GeminiProvider");
+  return ctx;
+};
 
-export const GeminiProvider = ({ children }) => {
+const API_BASE =
+  import.meta.env.VITE_BACKEND_URL?.replace(/\/+$/, "") || "http://localhost:5000";
+
+export function GeminiProvider({ children }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  const generateContent = async (prompt) => {
-    setLoading(true);
+  const generateContent = useCallback(async (prompt) => {
     setError(null);
-
+    if (!prompt || !prompt.trim()) return "";
+    setLoading(true);
     try {
-      // Call your backend instead of Gemini directly
-      const response = await fetch("http://localhost:5000/api/generate", {
+      const res = await fetch(`${API_BASE}/api/generate`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ prompt }),
       });
-
-      const data = await response.json();
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Request failed");
+      return data.text || "";
+    } catch (e) {
+      setError(e);
+      return "";
+    } finally {
       setLoading(false);
-
-      if (data.error) {
-        throw new Error(data.error);
-      }
-
-      return data.text;
-    } catch (err) {
-      console.error(err);
-      setError(err);
-      setLoading(false);
-      return null;
     }
-  };
+  }, []);
 
   return (
     <GeminiContext.Provider value={{ generateContent, loading, error }}>
       {children}
     </GeminiContext.Provider>
   );
-};
+}
